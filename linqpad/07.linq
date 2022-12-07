@@ -33,7 +33,8 @@ $ ls
 async Task Main()
 {
 	var input = await GetInput(7);
-	
+
+	SolvePartOne(input).Dump();
 	SolvePartTwo(input).Dump();
 }
 
@@ -71,6 +72,7 @@ List<Directory> MapFileSystem(string input)
 		{
 			["$", "cd", var target] => ChangeDirectory(target, currentDirectory, allDirectories),
 			["$", "ls"] => currentDirectory,
+			["dir", _] => currentDirectory,
 			_ => AddDirectoryContent(line, currentDirectory)
 		};
 	}
@@ -87,9 +89,7 @@ Directory AddDirectoryContent(string line, Directory currentDirectory)
 Directory ChangeDirectory(string target, Directory currentDirectory, List<Directory> allDirectories)
 {
 	if (target == "..")
-	{
 		return currentDirectory.Parent;
-	}		
 	
 	var dir = new Directory(target, currentDirectory);
 	currentDirectory.AddChild(dir);
@@ -110,9 +110,6 @@ record Directory(string Name, Directory Parent = null)
 	internal void AddContent(string line)
 	{
 		var parts = line.Split(' ');
-		
-		if (parts[0].StartsWith("dir"))
-			return;
 
 		var size = parts[0];
 		var name = parts[1];
