@@ -1,107 +1,166 @@
 <Query Kind="Program">
   <Namespace>System.Threading.Tasks</Namespace>
   <Namespace>System.Net.Http</Namespace>
+  <Namespace>System.Drawing</Namespace>
   <RuntimeVersion>7.0</RuntimeVersion>
 </Query>
 
 #load "input.linq"
 
-const string testInput = @"30373
-25512
-65332
-33549
-35390";
+const string testInput = @"R 5
+U 8
+L 8
+D 3
+R 17
+D 10
+L 25
+U 20";
 
 async Task Main()
 {
-	var input = await GetInput(8);
+	var input = await GetInput(9);
 
 	SolvePartOne(input).Dump();
 	SolvePartTwo(input).Dump();
 }
 
-int SolvePartOne(string input) 
+int SolvePartOne(string input)
 {
-	var treeMap = InputToTreeMap(input);
-	
-	for (int y = 0; y < treeMap.Length; y++)
-	{
-		for (int x = 0; x < treeMap[y].Length; x++)
-		{
-			var tree = treeMap[y][x];
-			if (x == 0 || y == 0 || x == treeMap[0].Length - 1 || y == treeMap.Length - 1)
+	var head = new Knot();
+	var tail = new Knot();
+
+	return 
+		input
+			.Split("\n", StringSplitOptions.RemoveEmptyEntries)
+			.Select(s =>
 			{
-				tree.Visible = true;
-				continue;
-			}
-
-			var northernTrees = treeMap[0..y].Select(row => row[x]);
-			var southernTrees = treeMap[(y+1)..(treeMap.Length)].Select(row => row[x]);
-			var westernTrees = treeMap[y][0..x];
-			var easternTrees = treeMap[y][(x+1)..(treeMap[0].Length)];
-			
-			tree.Visible =
-				northernTrees.All(t => t.Height < tree.Height) ||
-				southernTrees.All(t => t.Height < tree.Height) || 
-				westernTrees.All(t => t.Height < tree.Height) ||
-				easternTrees.All(t => t.Height < tree.Height);
-		}
-	}
-		
-	return treeMap.Sum(r => r.Count(t => t.Visible));
+				var parts = s.Trim().Split(' ');
+				return new Instruction(parts[0], Convert.ToInt32(parts[1]));
+			})
+			.Select(instruction => ProcessInstruction(instruction, head, tail))
+			.ToArray()
+			.Last()
+			.Tail.Visited
+			.Distinct()
+			.Count();
 }
-
 
 int SolvePartTwo(string input)
 {
-	var treeMap = InputToTreeMap(input);
-
-	for (int y = 0; y < treeMap.Length; y++)
-	{
-		for (int x = 0; x < treeMap[y].Length; x++)
-		{
-			var tree = treeMap[y][x];
-
-			if (x == 0 || y == 0 || x == treeMap[0].Length - 1 || y == treeMap.Length - 1)
-			{
-				continue;
-			}
-
-			var northernTrees = countVisibleTrees(treeMap[0..y].Select(row => row[x]).Reverse().ToArray(), tree);
-			var southernTrees = countVisibleTrees(treeMap[(y + 1)..(treeMap.Length)].Select(row => row[x]).ToArray(), tree);
-			var westernTrees = countVisibleTrees(treeMap[y][0..x].Reverse().ToArray(), tree);
-			var easternTrees = countVisibleTrees(treeMap[y][(x + 1)..(treeMap[0].Length)].ToArray(), tree);
-
-			tree.Score = northernTrees * westernTrees * southernTrees * easternTrees;
-		}
-	}
-
-
-	return treeMap.SelectMany(t => t.Select(t => t.Score)).Max(t => t);
-}
-
-int countVisibleTrees(Tree[] trees, Tree current)
-{
-	int visible = 0;
+	var knots = 
+		Enumerable
+			.Range(0, 10)
+			.Select(_ => new Knot())
+			.ToArray();
 	
-	for (int i = 0; i < trees.Length; i++)
-	{
-		visible++;
-		
-		if (trees[i].Height >= current.Height)
-			break;
-	}
-	
-	return visible;
-}
-
-Tree[][] InputToTreeMap(string input) =>
 	input
 		.Split("\n", StringSplitOptions.RemoveEmptyEntries)
-		.Select(s => s.Trim().Select(c => new Tree((int)Char.GetNumericValue(c))).ToArray())
-		.ToArray();
+		.Select(s =>
+		{
+			var parts = s.Trim().Split(' ');
+			return new Instruction(parts[0], Convert.ToInt32(parts[1]));
+		})
+		.SelectMany(instruction => ProcessInstructionTwo(instruction, knots))
+		.Last()
+		.Visited
+		.Distinct()
+		.Count()
+		.Dump();
 		
-record Tree(int Height) {
-	public bool Visible { get; set; }
-	public int Score { get; set; }
+ 	return 0;
 }
+
+(Knot Head, Knot Tail) ProcessInstruction(Instruction instruction, Knot head, Knot tail) =>
+	Enumerable
+		.Range(0, instruction.Distance)
+		.Select(_ => (head.Move(instruction.Direction, 1), tail.Follow(head)))
+		.ToArray()
+		.Last();
+
+Knot[] ProcessInstructionTwo(Instruction instruction, Knot[] knots)
+{
+	for (int i = 0; i < instruction.Distance; i++)
+	{
+		knots[0].Move(instruction.Direction, 1);
+		
+		for (int k = 1; k < knots.Length; k++)
+		{
+			knots[k].Follow(knots[k-1]);
+		}
+	}
+	
+	return knots;
+}
+
+record Instruction(string Direction, int Distance);
+
+record Knot()
+{
+	public List<Point> Visited = new() { new Point(0, 0) };
+
+	public Point Position => Visited.Last();
+	
+	public Knot Move(string direction, int distance)
+	{
+		Visited.Add(direction switch
+		{
+			"U" => new Point(Position.X, Position.Y + 1),
+			"D" => new Point(Position.X, Position.Y - 1),
+			"L" => new Point(Position.X - 1, Position.Y),
+			"R" => new Point(Position.X + 1, Position.Y),
+			"UR" => new Point(Position.X + 1, Position.Y + 1),
+			"UL" => new Point(Position.X - 1, Position.Y + 1),
+			"DR" => new Point(Position.X + 1, Position.Y - 1),
+			"DL" => new Point(Position.X - 1, Position.Y - 1),
+			_ => throw new ArgumentException("unexpected direction"),
+		});
+		
+		return this;
+	}
+	
+	public Knot Follow(Knot parent) 
+	{
+		var manhattanDistance = Math.Abs(parent.Position.X - Position.X) + Math.Abs(parent.Position.Y - Position.Y);
+		if (manhattanDistance > 1)
+		{
+			if (parent.Position.Y == Position.Y)
+			{
+				return Move(parent.Position.X > Position.X ? "R" : "L", 1);
+			}
+			
+			if (parent.Position.X == Position.X)
+			{
+				return Move(parent.Position.Y > Position.Y ? "U" : "D", 1);
+			}
+
+			if (manhattanDistance > 2)
+			{
+				if (parent.Position.X > Position.X && parent.Position.Y > Position.Y)
+				{
+					return Move("UR", 1);
+				}
+
+
+				if (parent.Position.X < Position.X && parent.Position.Y > Position.Y)
+				{
+					return Move("UL", 1);
+				}
+
+
+				if (parent.Position.X > Position.X && parent.Position.Y < Position.Y)
+				{
+					return Move("DR", 1);
+				}
+
+
+				if (parent.Position.X < Position.X && parent.Position.Y < Position.Y)
+				{
+					return Move("DL", 1);
+				}
+			}
+		}
+		
+		return this;
+	}
+}
+
