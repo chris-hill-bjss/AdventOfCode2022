@@ -158,8 +158,8 @@ async Task Main()
 {
 	var input = await GetInput(10);
 
-	//SolvePartOne(input).Dump();
-	SolvePartTwo(testInput).Dump();
+	SolvePartOne(input).Dump();
+	SolvePartTwo(input).Dump();
 }
 
 int SolvePartOne(string input)
@@ -177,13 +177,25 @@ int SolvePartOne(string input)
 		log[219].SignalStrength;
 }
 
-int SolvePartTwo(string input)
+string SolvePartTwo(string input)
 {
 	var cpu = new CPU();
 
 	var log = cpu.RunProgram(input).ToArray();
 	
-	return 0;
+	log
+		.Chunk(40)
+		.Select(row => row.Select((log, i) =>
+		{
+			var spritePixels = new[] { log.X - 1, log.X, log.X + 1 };
+			var pixel = spritePixels.Contains(i) ? '#' : '.';
+
+			return pixel;
+		}))
+		.Select(o => new string(o.ToArray()))
+		.Dump();
+		
+	return "";
 }
 
 class CPU
@@ -212,7 +224,7 @@ class CPU
 						cycle + instruction.Lifetime);
 			}	
 			
-			_log.Add(new LogEntry(cycle, _x, currentInstruction));
+			_log.Add(new LogEntry(cycle, _x));
 						
 			if (cycle == currentInstruction.CompletionCycle)
 			{
@@ -246,7 +258,7 @@ record Instruction(string Command)
 
 record ExecutingInstruction(Instruction Instruction, int CompletionCycle);
 
-record LogEntry(int Cycle, int X, ExecutingInstruction CurrentInstruction)
+record LogEntry(int Cycle, int X)
 {
 	public int SignalStrength => Cycle * X;
 };
